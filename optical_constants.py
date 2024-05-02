@@ -65,6 +65,31 @@ class Dispersion:
         return 4 * math.pi * k / wavelength
 
 
+class Sellmeier(Dispersion):
+    """
+    Sellmeier equation model for transparent media.
+    """
+
+    def __init__(self, B1, B2, B3, C1, C2, C3):
+        Dispersion.__init__(self)
+        self.B1 = B1
+        self.B2 = B2
+        self.B3 = B3
+        self.C1 = C1
+        self.C2 = C2
+        self.C3 = C3
+
+    def eps_1(self, E) -> float:
+        w = 1.239841973862093 / E  # wavelength in um (provided E is in eV)
+        w_sq = w**2
+        return 1 + self.B1 * w_sq / (w_sq - self.C1) + \
+            self.B2 * w_sq / (w_sq - self.C2) + \
+            self.B3 * w_sq / (w_sq - self.C3)
+
+    def eps_2(self, E) -> float:
+        return 0
+
+
 class Lorentz(Dispersion):
     """The Lorentz oscillator model considers the interaction between a light
     wave and an atom with a single resonance frequency due to bound
