@@ -11,7 +11,9 @@ References
        https://doi.org/10.1063/1.1497462
    [2] M. Fox Optical Properties of Solids. 2nd Ed. (2010)
 """
+import cmath
 import math
+
 from scipy.special import expi as Ei
 
 __version__ = '0.1'
@@ -81,7 +83,7 @@ class Sellmeier(Dispersion):
 
     def eps_1(self, E) -> float:
         w = 1.239841973862093 / E  # wavelength in um (provided E is in eV)
-        w_sq = w**2
+        w_sq = w ** 2
         return 1 + self.B1 * w_sq / (w_sq - self.C1) + \
             self.B2 * w_sq / (w_sq - self.C2) + \
             self.B3 * w_sq / (w_sq - self.C3)
@@ -90,10 +92,179 @@ class Sellmeier(Dispersion):
         return 0
 
 
+class JellisonModine(Dispersion):
+    """G. Jellison and F. Modine results for Tauc-Lorentz parametrization of optical constants."""
+
+    def __init__(self, A, E0, C, Eg, eps_inf=1):
+        """
+        :param A: Oscillator amplitude.
+        :param E0: Resonance energy.
+        :param C: Oscillator width.
+        :param Eg: Band gap.
+        """
+        Dispersion.__init__(self, eps_inf)
+        self.A = A
+        self.E0 = E0
+        self.C = C
+        self.Eg = Eg
+        self._E0sq = self.E0 ** 2
+        self._Csq = self.C ** 2
+        self._Egsq = self.Eg ** 2
+
+    def eps_1(self, E):
+        A, E0, E0sq, C, Csq, Eg, Egsq, pi, alpha, gamma2, zeta4, aln, aatan = self.A, self.E0, self._E0sq, self.C, \
+            self._Csq, self.Eg, self._Egsq, math.pi, self._alpha, self._gamma2, self._zeta4(E), self._aln(E), \
+            self._aatan(E)
+
+        if self.E0 <= self.C / 2:  # critically- or over-damped DHO is not supported
+            raise Exception(f'E0 must be greater than C/2')
+
+        out = 0
+
+        out += C * aln / (2 * alpha * E0) * \
+               cmath.log((E0sq + Egsq + alpha * Eg) / (E0sq + Egsq - alpha * Eg))
+        out -= aatan / E0 * \
+               (pi - cmath.atan((2 * Eg + alpha) / C) + cmath.atan((-2 * Eg + alpha) / C))
+        out += 2 * E0 / alpha * Eg * (E ** 2 - gamma2) * \
+               (pi + 2 * cmath.atan(2 * (gamma2 - Egsq) / (alpha * C)))
+        out -= E0 * C * (E ** 2 + Egsq) / E * \
+               cmath.log(abs(E - Eg) / (E + Eg))
+        out += 2 * E0 * C * Eg * \
+               cmath.log(abs(E - Eg) * (E + Eg) / cmath.sqrt((E0sq - Egsq) ** 2 + Egsq * Csq))
+
+        out *= A / (pi * zeta4)
+
+        out += self.eps_inf
+
+        if out.imag == 0:
+            return out.real
+        else:
+            raise Exception(f'Non-zero imaginary part obtained for {E} eV: {out}')
+
+    def eps_2(self, E):
+        if E <= self.Eg:
+            return 0
+        else:
+            return self.A * self.E0 * self.C * (E - self.Eg) ** 2 / (
+                    (E ** 2 - self.E0 ** 2) ** 2 + self.C ** 2 * E ** 2) / E
+
+    @property
+    def _alpha(self):
+        return cmath.sqrt(4 * self._E0sq - self._Csq)
+
+    @property
+    def _alpha2(self):
+        return 4 * self._E0sq - self.C ** 2
+
+    @property
+    def _gamma2(self):
+        return self._E0sq - self._Csq / 2
+
+    def _zeta4(self, E):
+        return (E ** 2 - self._gamma2) ** 2 + 0.25 * self._alpha2 * self.C ** 2
+
+    def _aln(self, E):
+        return (self._Egsq - self._E0sq) * E ** 2 + self._Egsq * self._Csq - self._E0sq * (self._E0sq + 3 * self._Egsq)
+
+    def _aatan(self, E):
+        return (E ** 2 - self._E0sq) * (self._E0sq + self._Egsq) + self._Egsq * self._Csq
+
+
+class Foldyna(Dispersion):
+    """
+    From "Urbach tail extension of Tauc-Lorentz model dielectric function" by M. Foldyna.
+    """
+
+    def __init__(self, A, E0, C, Eg, Ec, eps_inf=1):
+        """
+
+        :param A: Oscillator amplitude (eV).
+        :param E0: Resonance energy (eV).
+        :param C: Oscillator width (eV).
+        :param Eg: Band gap (eV).
+        :param Ec: parameter describing Urbach tail width (eV).
+        :param eps_inf: Real part of dielectric function at infinite frequency.
+        """
+        Dispersion.__init__(self, eps_inf)
+        if E0 <= C / 2:  # critically- or over-damped DHO is not supported
+            raise Exception(f'E0 must be greater than C/2')
+        self._A = A
+        self._E0 = E0
+        self._E0sq = E0 ** 2
+        self._C = C
+        self._AE0C = A * E0 * C
+        self._Csq = C ** 2
+        self._gamma2 = self._E0sq - self._Csq / 2
+        self._alpha = cmath.sqrt(4 * self._E0sq - self._Csq)
+        self._Eg = Eg
+        self._Egsq = Eg**2
+        self._EgsqCsq = self._Egsq * self._Csq
+        self._Ec = Ec
+        self._Ecsq = Ec ** 2
+        self._CsqEcsq = C ** 2 * Ec ** 2
+        self._EcmEg = self._Ec - self._Eg
+        self._EcsqmE0sq = self._Ecsq - self._E0sq
+        c1 = self._CsqEcsq + self._EcsqmE0sq ** 2
+        self._Eu = self._EcmEg / (
+                3 - 2 * self._Ec * self._EcmEg * (self._Csq + 2 * self._EcsqmE0sq) / c1
+        )
+        self._Au = math.exp(-self._Ec / self._Eu) * (self._AE0C * self._EcmEg ** 2) / c1
+
+    def _aL(self, E):
+        return (self._Egsq - self._E0sq) * E**2 + self._EgsqCsq - self._E0sq * (self._E0sq + 3 * self._Egsq)
+
+    def _aA(self, E):
+        return (E**2 - self._E0sq) * (self._E0sq + self._Egsq) + self._EgsqCsq
+
+    def _zeta4(self, E):
+        Esq = E**2
+        return (Esq - self._E0sq)**2 + self._Csq * Esq
+
+    def _eps_1_TL(self, E):
+        z4 = self._zeta4(E)
+        absEcmE = abs(self._Ec - E)
+        out = 0
+        out -= self._AE0C * (E**2 + self._Egsq) / (math.pi * z4 * E) * cmath.log(absEcmE / (self._Ec + E))
+        out += 2 * self._AE0C * self._Eg / (math.pi * z4) * \
+               cmath.log(absEcmE * (self._Ec + E) / cmath.sqrt(self._EcsqmE0sq**2 + self._CsqEcsq))
+        out += self._A * self._C * self._aL(E) / (2 * math.pi * z4 * self._alpha * self._E0) * \
+               cmath.log((self._E0sq + self._Ecsq + self._alpha * self._Ec) /
+                         (self._E0sq + self._Ecsq - self._alpha * self._Ec))
+        out -= self._A * self._aA(E) / (math.pi * z4 * self._E0) * \
+               (math.pi -
+                cmath.atan((2 * self._Ec + self._alpha) / self._C) -
+                cmath.atan((2 * self._Ec - self._alpha) / self._C))
+        out += 4 * self._A * self._E0 * self._Eg * (E**2 - self._gamma2) / (math.pi * z4 * self._alpha) * \
+               (math.pi / 2 - cmath.atan(2 * (self._Ecsq - self._gamma2) / (self._alpha * self._C)))
+
+        if out.imag == 0:
+            return out.real
+        else:
+            raise Exception(f'Non-zero imaginary part obtained for {E} eV: {out}')
+
+    def _eps_1_U(self, E):
+        EdEu = E / self._Eu
+        return self._Au / (E * math.pi) * (math.exp(-EdEu) * (Ei(E / self._Eu) - Ei((self._Ec + E) / self._Eu)) +
+                                           math.exp(EdEu) * (Ei((self._Ec - E) / self._Eu) - Ei(-EdEu)))
+
+    def eps_1(self, E):
+        return self.eps_inf + self._eps_1_TL(E) + self._eps_1_U(E)
+
+    def eps_2(self, E):
+        Esq = E ** 2
+        if E > self._Ec:
+            return 1 / E * (self._AE0C * (E - self._Eg) ** 2) / (
+                        (Esq - self._E0sq) ** 2 + self._Csq * Esq)
+        else:
+            return self._Au / E * math.exp(E / self._Eu)
+
+
 class Lorentz(Dispersion):
     """The Lorentz oscillator model considers the interaction between a light
     wave and an atom with a single resonance frequency due to bound
     electrons.
+    In terms of DHO, oscillator could be under-damped (E0 > Gamma/2), critically damped (E0 = Gamma/2) or over-damped
+    (E0 < Gamma/2). For under-damped DHO, the resonant energy could be defined as Er = sqrt(E0^2 - Gamma^2 / 4).
     """
 
     def __init__(self, A, E0, Gamma, eps_inf=1):
@@ -597,10 +768,12 @@ class CodyLorentz:
 
 
 if __name__ == '__main__':
-    tl = TaucLorentz(128.6, 2.52, 3.93, 0.67, 0.67 + 0.22, 0.101)  # from (Němec, 2009)
+    tl = Foldyna(128.6, 2.52, 3.93, 0.67, 0.7)  # from (Němec, 2009)
     Energy = 1239.841973862093 / 1030
+    print(f'{Energy} eV')
     print('eps_1 = {:.2f}'.format(tl.eps_1(Energy)))
     print('eps_2 = {:.2f}'.format(tl.eps_2(Energy)))
+    quit()
     print('n = {:.4g}'.format(tl.n(Energy)))
     print('k = {:.4g}'.format(tl.k(Energy)))
     print('R = {:.3g}%'.format(tl.R(Energy) * 100))
