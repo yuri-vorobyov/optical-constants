@@ -518,9 +518,9 @@ class CodyLorentz:
         self.eps_inf = eps_inf
 
     @property
-    def _zeta(self):
+    def _zeta2(self):
         """Auxiliary quantity. Eq. 9"""
-        return math.sqrt(self.E_0 ** 2 - self.Gamma ** 2 / 2)
+        return self.E_0 ** 2 - self.Gamma ** 2 / 2
 
     @property
     def _chi(self):
@@ -531,7 +531,7 @@ class CodyLorentz:
     def _I_1T(self):
         """Auxiliary quantity. Eq. 6"""
         com_mul = 1 / (2 * self._chi * self.Gamma)
-        arg = 2 * (self.E_t ** 2 - self._zeta ** 2) / (self._chi * self.Gamma)
+        arg = 2 * (self.E_t ** 2 - self._zeta2) / (self._chi * self.Gamma)
         return com_mul * (math.pi - 2 * math.atan(arg))
 
     @property
@@ -562,17 +562,17 @@ class CodyLorentz:
         return math.sqrt(self.E_p ** 2 + self.E_g ** 2)
 
     @property
-    def _K(self):
-        """Auxiliary quantity."""
-        return math.sqrt(2 * self._F ** 2 + 2 * self._zeta ** 2 - 4 * self.E_g ** 2)
+    def _K2(self):
+        """Auxiliary quantity, Eq. (30)."""
+        return 2 * self._F ** 2 + 2 * self._zeta2 - 4 * self.E_g ** 2
 
     @property
-    def _Y(self):
+    def _Y4(self):
         """Auxiliary quantity."""
         term_1 = self.E_0 ** 4
-        term_2 = self._F ** 2 * (self._K ** 2 - self._F ** 2)
-        term_3 = -4 * self.E_g ** 2 * self._K ** 2
-        return math.sqrt(math.sqrt(term_1 + term_2 + term_3))
+        term_2 = self._F ** 2 * (self._K2 - self._F ** 2)
+        term_3 = -4 * self.E_g ** 2 * self._K2
+        return term_1 + term_2 + term_3
 
     def _G_C(self, E):
         """
@@ -615,7 +615,7 @@ class CodyLorentz:
         Auxiliary function.
         """
         com_mul = 2 / math.pi * self.A * self.E_0 * self.Gamma
-        term_a3 = a3 * (self._zeta ** 2 * self._I_1T -
+        term_a3 = a3 * (self._zeta2 * self._I_1T -
                         math.log(math.sqrt(math.sqrt(self._L_D(self.E_t)))))
         term_a2 = a2 * (self._I_0AT + self._I_0BT)
         term_a1 = a1 * self._I_1T
@@ -629,9 +629,9 @@ class CodyLorentz:
         """
         Auxiliary function.
         """
-        term_1 = (self._K ** 2 - self._F ** 2) * self._b_0C(E)
-        term_2 = 2 * self.E_g * self._K ** 2 * self._b_1C(E)
-        term_3 = -E * (E ** 2 - 2 * self._zeta ** 2) * (self._c_0C(E) -
+        term_1 = (self._K2 - self._F ** 2) * self._b_0C(E)
+        term_2 = 2 * self.E_g * self._K2 * self._b_1C(E)
+        term_3 = -E * (E ** 2 - 2 * self._zeta2) * (self._c_0C(E) -
                                                         self._d_0C(E))
         return 1 + term_1 + term_2 + term_3
 
@@ -640,8 +640,8 @@ class CodyLorentz:
         Auxiliary function.
         """
         term_1 = -2 * self.E_g * self._b_0C(E)
-        term_2 = (self._K ** 2 - self._F ** 2) * self._b_1C(E)
-        term_3 = -(E ** 2 - 2 * self._zeta ** 2) * (self._c_0C(E) + self._d_0C(E))
+        term_2 = (self._K2 - self._F ** 2) * self._b_1C(E)
+        term_3 = -(E ** 2 - 2 * self._zeta2) * (self._c_0C(E) + self._d_0C(E))
         return term_1 + term_2 + term_3
 
     def _a_2C(self, E):
@@ -663,14 +663,14 @@ class CodyLorentz:
         """
         Auxiliary function.
         """
-        num_com_mul = self._Y ** 4 * self._F ** 2
+        num_com_mul = self._Y4 * self._F ** 2
         num_1 = (self._c_0C(E) - self._d_0C(E)) / E
-        num_2 = 2 * self.E_g * self._K ** 2 / self._Y ** 4 * (self._c_0C(E) +
+        num_2 = 2 * self.E_g * self._K2 / self._Y4 * (self._c_0C(E) +
                                                               self._d_0C(E))
         num = num_com_mul * (self._L_D(E) * (num_1 + num_2) - 1)
-        den_1 = (self._K ** 2 - self._F ** 2) * self._F ** 2 * self._Y ** 4
-        den_2 = self.E_0 ** 4 * self._Y ** 4
-        den_3 = 4 * self.E_g ** 2 * self._F ** 2 * self._K ** 4
+        den_1 = (self._K2 - self._F ** 2) * self._F ** 2 * self._Y4
+        den_2 = self.E_0 ** 4 * self._Y4
+        den_3 = 4 * self.E_g ** 2 * self._F ** 2 * self._K2 ** 2
         den = den_1 + den_2 + den_3
         return num / den
 
@@ -678,8 +678,8 @@ class CodyLorentz:
         """
         Auxiliary function.
         """
-        com_mul = 1 / self._Y ** 4
-        term_1 = 2 * self.E_g * self._K ** 2 * self._b_0C(E)
+        com_mul = 1 / self._Y4
+        term_1 = 2 * self.E_g * self._K2 * self._b_0C(E)
         term_2 = -self._L_D(E) * (self._c_0C(E) + self._d_0C(E))
         return com_mul * (term_1 + term_2)
 
@@ -719,8 +719,7 @@ class CodyLorentz:
         term_4 = math.exp(-(E + self.E_t) / self.E_u)
         term_5 = Ei((self.E_t + E) / self.E_u)
         term_6 = Ei(E / self.E_u)
-        return com_mul * (term_1 * (term_2 - term_3) - term_4 * (term_5 -
-                                                                 term_6))
+        return com_mul * (term_1 * (term_2 - term_3) - term_4 * (term_5 - term_6))
 
     def eps_1(self, E):
         """
