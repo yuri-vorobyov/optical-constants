@@ -13,6 +13,7 @@ References
 """
 import cmath
 import math
+import numpy as np
 
 from scipy.special import expi as Ei
 
@@ -40,7 +41,7 @@ class Dispersion:
         """
         e1 = self.eps_1(E)
         e2 = self.eps_2(E)
-        return math.sqrt((math.hypot(e1, e2) + e1) / 2)
+        return np.sqrt((np.hypot(e1, e2) + e1) / 2)
 
     def k(self, E):
         """
@@ -772,7 +773,7 @@ if __name__ == '__main__':
     print(f'{Energy} eV')
     print('eps_1 = {:.2f}'.format(tl.eps_1(Energy)))
     print('eps_2 = {:.2f}'.format(tl.eps_2(Energy)))
-    quit()
+    # quit()
     print('n = {:.4g}'.format(tl.n(Energy)))
     print('k = {:.4g}'.format(tl.k(Energy)))
     print('R = {:.3g}%'.format(tl.R(Energy) * 100))
@@ -793,5 +794,5 @@ if __name__ == '__main__':
 
     x = 1239.841973862093e-9 / w
     plt.plot(y[:, 0], y[:, 2])
-    plt.yscale('log')
+    # plt.yscale('log')
     plt.show()
