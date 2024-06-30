@@ -768,7 +768,7 @@ class CodyLorentz:
 
 
 if __name__ == '__main__':
-    tl = Foldyna(128.6, 2.52, 3.93, 0.67, 0.7)  # from (Němec, 2009)
+    tl = TaucLorentz(128.6, 2.52, 3.93, 0.67, 0.67, 0.01)  # from (Němec, 2009)
     Energy = 1239.841973862093 / 1030
     print(f'{Energy} eV')
     print('eps_1 = {:.2f}'.format(tl.eps_1(Energy)))
@@ -781,14 +781,14 @@ if __name__ == '__main__':
 
     import numpy as np
 
-    w = np.linspace(500, 2500, 501) * 1e-9  # nm
+    w = np.linspace(300, 2500, 501) * 1e-9  # nm
     y = []
     for i in range(len(w)):
         Energy = 1.239841973862093e-06 / w[i]
-        y.append([w[i] * 1e9, tl.n(Energy), tl.k(Energy)])
+        y.append([Energy, tl.a(Energy), tl.k(Energy)])
 
     y = np.array(y)
-    np.savetxt('GST225 TL (w, n, k).txt', y)
+    # np.savetxt('GST225 TL (w, n, k).txt', y)
 
     import matplotlib.pyplot as plt
 
